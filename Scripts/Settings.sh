@@ -17,25 +17,31 @@ if [[ $WRT_URL == *"lede"* ]]; then
 	#修改默认时间格式
 	sed -i 's/os.date()/os.date("%Y-%m-%d %H:%M:%S %A")/g' $LEDE_FILE
 	#添加编译日期标识
-	sed -i "s/(\(<%=pcdata(ver.luciversion)%>\))/\1 \/ $WRT_REPO-$WRT_DATE/" $LEDE_FILE
+	sed -i "s/(\(<%=pcdata(ver.luciversion)%>\))/\1 \/ $WRT_REPO-$WRT_DATE/g" $LEDE_FILE
 	#修改默认WIFI名
 	sed -i "s/ssid=.*/ssid=$WRT_WIFI/g" ./package/kernel/mac80211/files/lib/wifi/mac80211.sh
-elif [[ $WRT_URL == *"immortalwrt"* ]]; then
-	#添加编译日期标识
-	VER_FILE=$(find ./feeds/luci/modules/ -type f -name "10_system.js")
-	awk -v wrt_repo="$WRT_REPO" -v wrt_date="$WRT_DATE" '{ gsub(/(\(luciversion \|\| \047\047\))/, "& + (\047 / "wrt_repo"-"wrt_date"\047)") } 1' $VER_FILE > temp.js && mv -f temp.js $VER_FILE
+else
 	#修改默认WIFI名
-	sed -i "s/ssid=.*/ssid=$WRT_WIFI/g" ./package/network/config/wifi-scripts/files/lib/wifi/mac80211.sh
+	sed -i "s/ssid=.*/ssid='$WRT_WIFI'/g" $(find ./package/network/config/wifi-scripts/files/lib/wifi/ -type f -name "mac80211.*")
+	#修改immortalwrt.lan关联IP
+	sed -i "s/192\.168\.[0-9]*\.[0-9]*/$WRT_IP/g" $(find ./feeds/luci/modules/luci-mod-system/ -type f -name "flash.js")
+	#添加编译日期标识
+	sed -i "s/(\(luciversion || ''\))/(\1) + (' \/ $WRT_REPO-$WRT_DATE')/g" $(find ./feeds/luci/modules/luci-mod-status/ -type f -name "10_system.js")
+	#替换chinadns-ng/Makefile
+	mv -f ../Patches/chinadns-ng/Makefile ./feeds/packages/net/chinadns-ng/
 fi
 
-#配置文件修改
+#默认主题修改
 echo "CONFIG_PACKAGE_luci-theme-$WRT_THEME=y" >> ./.config
 echo "CONFIG_PACKAGE_luci-app-$WRT_THEME-config=y" >> ./.config
 
+#科学插件设置
 if [[ $WRT_URL == *"lede"* ]]; then
-	echo "CONFIG_PACKAGE_luci-app-ssr-plus=y" >> ./.config
 	echo "CONFIG_PACKAGE_luci-app-openclash=y" >> ./.config
-elif [[ $WRT_URL == *"immortalwrt"* ]]; then
+	echo "CONFIG_PACKAGE_luci-app-passwall=y" >> ./.config
+	echo "CONFIG_PACKAGE_luci-app-ssr-plus=y" >> ./.config
+	echo "CONFIG_PACKAGE_luci-app-turboacc=y" >> ./.config
+else
 	echo "CONFIG_PACKAGE_luci=y" >> ./.config
 	echo "CONFIG_LUCI_LANG_zh_Hans=y" >> ./.config
 	echo "CONFIG_PACKAGE_luci-app-homeproxy=y" >> ./.config
